@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<title>CS 424 Final</title>
+<script src="resources/three.js"></script>
+
+<script>
+
+"use strict";
+/*
+ *How to do collision using ammo.js pr physi.js?
+*/
+var canvas, renderer, scene, camera; // Standard three.js requirements.
+
+var controls;  // An OrbitControls object that is used to implement
+               // rotation of the scene using the mouse.  (It actually rotates
+               // the camera around the scene.)
+
+var animating = false;  // Set to true when an animation is in progress.
+
+var bubbles = []; // array of bubbles
+var bubbleNum = 30;
+var boxSize = 25;
+var sceneRotateX = 0;  // Amount by which world object is rotated around the y-axis
+                     //    (carrying the camera with it).
+var sceneRotateY = 0;  // Amount by which world object is rotated around the y-axis
+                     //    (carrying the camera with it).
+var world; // object that camera is linked to
+/**
+ *  The render function draws the scene.
+ */
+function render() {
+    renderer.render(scene, camera);
+}
+
+/**
+ * This function is called by the init() method to create the world. 
+ */
+function createWorld() {
+    
+    renderer.setClearColor("white"); // Background color for scene.
+    scene = new THREE.Scene();
+    
+    // ------------------- Make a camera with viewpoint light ----------------------
+    
+    camera = new THREE.PerspectiveCamera(30, canvas.width/canvas.height, 0.1, 100);
+    camera.position.set(25,40,50);
+    camera.lookAt(scene.position);
+
+
+    var light;  // A light shining from the direction of the camera; moves with the camera.
+    light = new THREE.DirectionalLight();
+    light.position.set(0,0,1);
+	camera.add(light);    
+    
+    //------------------- Create the scene's visible objects ----------------------
+    world = new THREE.Object3D();
+   // cube to hold all the balls
+   var cube = new THREE.Mesh(
+        new THREE.BoxGeometry(boxSize,boxSize,boxSize),
+        new THREE.MeshPhongMaterial( {
+            polygonOffset: true,  // will make sure the edges are visible.
+            polygonOffsetUnits: 1,
+            polygonOffsetFactor: 1,
+            color: "lightblue",
+            transparent: true,
+            opacity: 0.25
+        } )
+    );
+	scene.add(cube);
+    scene.add(new THREE.EdgesHelper(cube, "black")); // Shows a whitewireframe without the diagonal edges.
+    for (var b = 0; b < bubbleNum; b++){
+        var rad = Math.random() * 0.5 + 1;
+        var bubble = new THREE.Mesh(
+            new THREE.SphereGeometry(rad, 32, 16),
+            new THREE.MeshPhongMaterial( {
+                color: Math.random() * 0xFFFFFF
+                })
+            );
+        bubble.radius = rad;
+		if ( b < 5 )
+		bubble.position.set(-(bubble.radius - boxSize/5.0) + (b - 1) * (bubble.radius - boxSize/5.0), 0, - 2 * (boxSize/5.0 - bubble.radius));
+		else if ( b < 10 )
+		bubble.position.set(-(bubble.radius - boxSize/5.0) + (b-6) * (bubble.radius - boxSize/5.0), 2 * (bubble.radius - boxSize/5.0), - 2 * (boxSize/5.0 - bubble.radius));
+		else if ( b < 15 )
+		bubble.position.set(-(bubble.radius - boxSize/5.0) + (b-11) * (bubble.radius - boxSize/5.0), 2 * (boxSize/5.0 - bubble.radius), - 2 * (boxSize/5.0 - bubble.radius));
+		else if ( b < 20 )
+		bubble.position.set(-(bubble.radius - boxSize/5.0) + (b-16) * (bubble.radius - boxSize/5.0), 0,  2*(boxSize/5.0 - bubble.radius));
+		else if ( b < 25 )
+		bubble.position.set(-(bubble.radius - boxSize/5.0) + (b-21) * (bubble.radius - boxSize/5.0), 2 * (bubble.radius - boxSize/5.0), 2*(boxSize/5.0 - bubble.radius));
+		else
+		bubble.position.set(-(bubble.radius - boxSize/5.0) + (b-26) * (bubble.radius - boxSize/5.0), 2 * (boxSize/5.0 - bubble.radius), 2*(boxSize/5.0 - bubble.radius));
+
+        bubble.dx = Math.random() * 0.25 - 0.025;
+        bubble.dy = Math.random() * 0.25 - 0.025;
+        bubble.dz = Math.random() * 0.25 - 0.025;
+        if (Math.random() < 0.5)
+            bubble.dx = -bubble.dx;
+        if (Math.random() < 0.5)
+            bubble.dy = -bubble.dy;
+        if (Math.random() < 0.5)
+            bubble.dz = -bubble.dz;
+        bubbles.push(bubble);
+        scene.add(bubble);
+    }
+	world.add(camera);
+	scene.add(world);
+
+} // end function createWorld()
+
+/**
+ *  This function is called once for each frame of the animation, before
+ *  the render() function is called for that frame.  It updates any
+ *  animated properties.
+ */
+function updateForFrame() {
+	if(animating){
+		for (var b = 0; b < bubbleNum; b++) {
+	        // checks to see if bubble collides with another bubble
+	        for (var c = 0; c < bubbleNum; c++) {
+	            if (b != c){
+	                if (distance(bubbles[b], bubbles[c]) <= bubbles[b].radius + bubbles[c].radius) {
+	                    if (Math.abs(bubbles[b].position.x - bubbles[c].position.x) <= bubbles[b].radius + bubbles[c].radius) {
+							bubbles[b].dx *= -1;
+	                    }
+	                    if (Math.abs(bubbles[b].position.y - bubbles[c].position.y) <= bubbles[b].radius + bubbles[c].radius) {
+							bubbles[b].dy *= -1;
+	                    }
+	                    if (Math.abs(bubbles[b].position.z - bubbles[c].position.z) <= bubbles[b].radius + bubbles[c].radius) {
+							bubbles[b].dz *= -1;
+	                    }
+	                }
+	            }
+	        }
+			// bubble collides with right wall
+	        if (bubbles[b].position.x > boxSize / 2.0 - bubbles[b].radius) {
+				bubbles[b].position.x = boxSize / 2.0 - bubbles[b].radius;
+	            bubbles[b].dx = -bubbles[b].dx;
+			} // bubble collides with left wall
+			else if (bubbles[b].position.x < -boxSize / 2.0 + bubbles[b].radius) {
+				bubbles[b].position.x = -boxSize / 2.0 + bubbles[b].radius;
+				bubbles[b].dx = -bubbles[b].dx;
+			} // bubble collides with top wall
+			if (bubbles[b].position.y > boxSize / 2.0 - bubbles[b].radius) {
+				bubbles[b].position.y = boxSize / 2.0 - bubbles[b].radius;
+				bubbles[b].dy *= -1;
+			} // bubble collides with bottom wall
+			else if (bubbles[b].position.y < -boxSize / 2.0 + bubbles[b].radius) {
+				bubbles[b].position.y = -boxSize / 2.0 + bubbles[b].radius;
+				bubbles[b].dy *= -1;
+			} // bubble collides with front wall
+			if (bubbles[b].position.z > boxSize / 2.0 - bubbles[b].radius) {
+				bubbles[b].position.z = boxSize / 2.0 - bubbles[b].radius;
+				bubbles[b].dz *= -1;
+			} // bubble collides with back wall
+			else if (bubbles[b].position.z < -boxSize / 2.0 + bubbles[b].radius) {
+				bubbles[b].position.z = -boxSize / 2.0 + bubbles[b].radius;
+				bubbles[b].dz *= -1;
+			}
+			bubbles[b].position.x += bubbles[b].dx;
+	        bubbles[b].position.y += bubbles[b].dy;
+	        bubbles[b].position.z += bubbles[b].dz;
+		}
+	}
+}
+/* This function calculates the distance between two objects (bubbles). */
+function distance(object1, object2) {
+    var changeX = object1.position.x - object2.position.x;
+    var changeY = object1.position.y - object2.position.y;
+    var changeZ = object1.position.z - object2.position.z;
+    return Math.sqrt(changeX*changeX + changeY*changeY + changeZ*changeZ);
+}
+
+/* Called when the user hits a key */
+function doKey(evt) {
+	var key = evt.keyCode;
+	var rotX = 0;
+	var rotY = 0;
+	if (key == 32) {  // space bar
+        if (animating) {
+            animating = false;  // stops the animation
+        }
+        else {
+			animating = true;
+			requestAnimationFrame(doFrame);  // restart the animation
+        }
+    } else if (key == 65 || key == 37) { // rotates the camera to the right
+		rotY = 0.02;
+    } else if (key == 68 || key == 39) { // rotates the camera to the left
+		rotY = -0.02;
+    } else if (key == 92 || key == 38){ // rotates world object and camera up
+		rotX = 0.02;
+	} else if (key == 95 || key == 40){ // rotates world object and camera down
+		rotX = -0.02;
+	}
+	 if (rotY != 0) {
+		sceneRotateY += rotY;
+		world.rotation.y = sceneRotateY;
+	//	evt.stopPropagation();
+	}
+	if (rotX != 0) {
+		sceneRotateX += rotX;
+		world.rotation.x = sceneRotateX;
+	//	evt.stopPropagation();
+	}
+}
+
+function doFrame() {
+        updateForFrame();
+		render();
+        requestAnimationFrame(doFrame);
+}
+
+/*----------------------------- INITIALIZATION ----------------------------------------
+
+/**
+ *  This function is called by the onload event so it will run after the
+ *  page has loaded.  It creates the renderer, canvas, and scene objects,
+ *  calls createWorld() to add objects to the scene, and renders the
+ *  initial view of the scene.  If an error occurs, it is reported.
+ */
+function init() {
+    try {
+        canvas = document.getElementById("glcanvas");
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            alpha: false
+        });
+    }
+    catch (e) {
+        document.getElementById("message").innerHTML="<b>Sorry, an error occurred:<br>" +
+                e + "</b>";
+        return;
+    }
+	document.addEventListener("keydown",doKey);
+    createWorld();
+    render();
+	requestAnimationFrame(doFrame);
+}
+
+</script>
+</head>
+<body onload="init()">
+
+<h2>Final</h2>
+
+<noscript>
+   <p style="color: #AA0000; font-weight: bold">Sorry, but this page requires JavaScript!</p>
+</noscript>
+
+<p style="color:#AA0000; font-weight: bold" id="message">
+</p>
+
+
+<div id="canvas-holder" style="float:left; border: thin solid black; background-color: white">
+   <canvas width=1200 height=600 id="glcanvas"></canvas>
+</div>
+
+</body>
+</html>
